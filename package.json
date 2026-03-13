@@ -1,0 +1,44 @@
+{
+  "name": "aplicacion-tablas-inversion",
+  "version": "1.0.0",
+  "description": "Aplicacion para el registro de inversiones y la gestion de tablas entre distintos perfiles",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electronmon .",
+    "build": "electron-builder --win portable",
+    "dist": "electron-builder",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/frannoia2/Aplicacion-tablas-inversion.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/frannoia2/Aplicacion-tablas-inversion/issues"
+  },
+  "homepage": "https://github.com/frannoia2/Aplicacion-tablas-inversion#readme",
+  "devDependencies": {
+    "electron": "^41.0.2",
+    "electron-builder": "^26.8.1",
+    "electronmon": "^2.0.4"
+  },
+  "build": {
+    "appId": "com.frannoia.aplicacion-tablas-inversion",
+    "productName": "AplicacionTablasInversion",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "assets/icon.ico"
+    }
+  }
+}
