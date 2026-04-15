@@ -3,10 +3,9 @@ const fs = require("fs");
 const path = require("path");
 
 function createWindow(){
-    const win = new BrowserWindow({
+    win = new BrowserWindow({
         width: 1000,
         height: 700,
-
         webPreferences: {
             preload: path.join(__dirname, "../preload/preload.js"),
             contextIsolation: true,
@@ -17,7 +16,9 @@ function createWindow(){
     win.loadFile(path.join(__dirname, "../renderer/index.html"));
 }
 
-function getDataPath(){
+app.whenReady().then(createWindow);
+// 📁 Obtener ruta de datos
+function getPerfilesPath(){
     const userDataPath = app.getPath("userData");
     const perfilesPath = path.join(userDataPath, "perfiles");
 
@@ -27,10 +28,15 @@ function getDataPath(){
 
     return perfilesPath;
 }
-
+// 📌 Crear perfil
 ipcMain.handle("crear-perfil", (event, nombre) => {
-    const perfilesPath = getDataPath();
+    const perfilesPath = getPerfilesPath();
     const filePath = path.join(perfilesPath, `${nombre}.json`);
+
+    if (fs.existsSync(filePath)) {
+        return { ok: false, error: "El perfil ya existe" };
+    }
+
     const data = {
         nombre: nombre,
         inversiones: []
@@ -38,24 +44,20 @@ ipcMain.handle("crear-perfil", (event, nombre) => {
 
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 
-    return true;
+    return { ok: true };
 });
-
+// 📌 Obtener perfiles
 ipcMain.handle("obtener-perfiles", () => {
-    const perfilesPath = getDataPath();
+    const perfilesPath = getPerfilesPath();
     const files = fs.readdirSync(perfilesPath);
 
     return files.map(file => file.replace(".json", ""));
 });
-
+// 📌 Cargar perfil
 ipcMain.handle("cargar-perfil", (event, nombre) => {
-    const perfilesPath = getDataPath();
+    const perfilesPath = getPerfilesPath();
     const filePath = path.join(perfilesPath, `${nombre}.json`);
     const data = fs.readFileSync(filePath);
 
     return JSON.parse(data);
-});
-
-app.whenReady().then(() => {
-    createWindow();
 });

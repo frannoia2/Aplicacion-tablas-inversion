@@ -1,21 +1,19 @@
-const btn = document.getElementById("btn");
-const output = document.getElementById("output");
+// Estado global
+let perfilActual = null;
 
-function irPerfil(){
-    document.getElementById("home").style.display = "none";
-    document.getElementById("perfil").style.display = "block";
-}
+// 📌 Cargar perfiles al iniciar
+document.addEventListener("DOMContentLoaded", () => {
+  cargarPerfiles();
 
-function volver(){
-    document.getElementById("perfil").style.display = "none";
-    document.getElementById("home").style.display = "block";
-}
-
+  document.getElementById("btnCrear").addEventListener("click", crearPerfil);
+  document.getElementById("btnVolver").addEventListener("click", volverHome);
+});
+// 📌 Obtener perfiles y mostrarlos
 async function cargarPerfiles() {
-    const perfiles = await window.parseInt.obtenerPerfiles();
+    const perfiles = await window.api.obtenerPerfiles();
     const lista = document.getElementById("listaPerfiles");
-
     lista.innerHTML = "";
+
     perfiles.forEach(nombre => {
         const li = document.createElement("li");
         
@@ -24,19 +22,38 @@ async function cargarPerfiles() {
         lista.appendChild(li);
     });
 }
-
+// 📌 Crear perfil
 async function crearPerfil() {
-    const nombre = document.getElementById("nombrePerfil").value;
+    const input = document.getElementById("nombrePerfil");
+    const nombre = input.value.trim();
 
     if (!nombre) return;
-    await window.api.crearPerfil(nombre);
+    const result = await window.api.crearPerfil(nombre);
+
+    if (!result.ok) {
+        alert(result.error);
+        return;
+    }
+
+    input.value = "";
     cargarPerfiles();
 }
-
+// 📌 Seleccionar perfil
 async function seleccionarPerfil(nombre) {
     const data = await window.api.crearPerfil(nombre);
 
-    console.log("Perfil cargado: ", data);
+    perfilActual = data;
+    document.getElementById("tituloPerfil").textContent = `Perfil: ${nombre}`;
+    mostrarVistaPerfil();
 }
 
-cargarPerfiles();
+// 📌 Navegación
+function mostrarVistaPerfil() {
+  document.getElementById("home").classList.add("hidden");
+  document.getElementById("perfil").classList.remove("hidden");
+}
+
+function volverHome() {
+  document.getElementById("perfil").classList.add("hidden");
+  document.getElementById("home").classList.remove("hidden");
+}

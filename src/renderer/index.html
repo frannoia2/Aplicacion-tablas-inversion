@@ -6,19 +6,27 @@
         <link rel="stylesheet" href="styles.css">
     </head>
     <body>
-        <div id="home">
-            <h2>Perfiles</h2>
+        <!-- 🏠 HOME -->
+        <div id="home" class="view">
+            <h1>Perfiles</h1>
 
-            <input id="nombrePerfil" placeholder="Nombre perfil">
-            <button onclick="crearPerfil()">Crear</button>
+            <div class="crear-perfil">
+            <input id="nombrePerfil" placeholder="Nombre del perfil">
+            <button id="btnCrear">Crear perfil</button>
+            </div>
 
             <ul id="listaPerfiles"></ul>
         </div>
 
-        <div id="perfil" style="display: none;">
-            <h1>Perfil</h1>
-            <button onclick="volver()">Volver</button>
+        <!-- 📊 PERFIL -->
+        <div id="perfil" class="view hidden">
+            <h1 id="tituloPerfil">Perfil</h1>
+
+            <button id="btnVolver">⬅ Volver</button>
+
+            <p>Aquí irá la tabla de inversiones (Módulo 3)</p>
         </div>
+
         <script src="renderer.js"></script>
     </body>
 </html>
