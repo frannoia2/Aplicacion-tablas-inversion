@@ -6,9 +6,19 @@
         <link rel="stylesheet" href="styles.css">
     </head>
     <body>
-        <h1>Registro de inversiones</h1>
-        <button id="btn">Mostrar versión</button>
-        <p id="output"></p>
+        <div id="home">
+            <h2>Perfiles</h2>
+
+            <input id="nombrePerfil" placeholder="Nombre perfil">
+            <button onclick="crearPerfil()">Crear</button>
+
+            <ul id="listaPerfiles"></ul>
+        </div>
+
+        <div id="perfil" style="display: none;">
+            <h1>Perfil</h1>
+            <button onclick="volver()">Volver</button>
+        </div>
         <script src="renderer.js"></script>
     </body>
 </html>
