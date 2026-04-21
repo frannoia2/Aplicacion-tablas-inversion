@@ -4,6 +4,9 @@
         <meta charset="UTF-8">
         <title>Registro de inversiones</title>
         <link rel="stylesheet" href="styles.css">
+        <link
+            href="vendor/tabulator.min.css"
+            rel="stylesheet">
     </head>
     <body>
         <!-- 🏠 HOME -->
@@ -24,9 +27,13 @@
 
             <button id="btnVolver">⬅ Volver</button>
 
-            <p>Aquí irá la tabla de inversiones (Módulo 3)</p>
+            <div class="toolbar">
+                <button id="btnNuevaFila">Añadir inversión</button>
+            </div>
+            <div id="tabla-inversiones"></div>
         </div>
 
+        <script src="vendor/tabulator.min.js"></script>
         <script src="renderer.js"></script>
     </body>
 </html>

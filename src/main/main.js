@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 
 function createWindow(){
-    win = new BrowserWindow({
+    const win = new BrowserWindow({
         width: 1000,
         height: 700,
         webPreferences: {
@@ -17,6 +17,7 @@ function createWindow(){
 }
 
 app.whenReady().then(createWindow);
+
 // 📁 Obtener ruta de datos
 function getPerfilesPath(){
     const userDataPath = app.getPath("userData");
@@ -28,6 +29,7 @@ function getPerfilesPath(){
 
     return perfilesPath;
 }
+
 // 📌 Crear perfil
 ipcMain.handle("crear-perfil", (event, nombre) => {
     const perfilesPath = getPerfilesPath();
@@ -46,6 +48,7 @@ ipcMain.handle("crear-perfil", (event, nombre) => {
 
     return { ok: true };
 });
+
 // 📌 Obtener perfiles
 ipcMain.handle("obtener-perfiles", () => {
     const perfilesPath = getPerfilesPath();
@@ -53,6 +56,7 @@ ipcMain.handle("obtener-perfiles", () => {
 
     return files.map(file => file.replace(".json", ""));
 });
+
 // 📌 Cargar perfil
 ipcMain.handle("cargar-perfil", (event, nombre) => {
     const perfilesPath = getPerfilesPath();
