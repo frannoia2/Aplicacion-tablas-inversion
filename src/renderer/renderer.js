@@ -63,6 +63,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btnCrear").addEventListener("click", crearPerfil);
   document.getElementById("btnVolver").addEventListener("click", volverHome);
   document.getElementById("btnNuevaFila").addEventListener("click", nuevaFila);
+  document.getElementById("btnGuardar").addEventListener("click", guardarDatos);
 });
 
 // 📌 Obtener perfiles y mostrarlos
@@ -134,7 +135,13 @@ function crearTabla(inversiones){
         height:"400px",
         layout:"fitColumns",
         data: inversiones,
-        columns:columnasInversion
+        columns:columnasInversion,
+        cellEdited:function(){
+            guardarDatos();
+        },
+        dataChanged:function(){
+            guardarDatos();
+        }
     });
 }
 
@@ -151,4 +158,26 @@ function nuevaFila(){
         cantidad:0,
         comision:0
     });
+}
+
+// 📌 Guardar datos
+async function guardarDatos() {
+    if(!tabla || !perfilActual) {
+        return;
+    }
+
+    const datosTabla = tabla.getData();
+    perfilActual.inversiones = datosTabla;
+
+    try {
+        const result = await window.api.guardarPerfil(perfilActual);
+
+        if (!result?.ok) {
+            throw new Error(result?.error || "No se pudo guardar el perfil.");
+        }
+
+        console.log("Datos guardados");
+    } catch (error) {
+        console.error("Error al guardar los datos del perfil.", error);
+    }
 }

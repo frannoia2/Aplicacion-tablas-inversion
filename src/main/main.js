@@ -65,3 +65,13 @@ ipcMain.handle("cargar-perfil", (event, nombre) => {
 
     return JSON.parse(data);
 });
+
+// 📌 Guardar perfil
+ipcMain.handle("guardar-perfil", (event, perfil) =>{
+    const perfilesPath = getPerfilesPath();
+    const filePath = path.join(perfilesPath, `${perfil.nombre}.json`);
+
+    fs.writeFileSync(filePath, JSON.stringify(perfil, null, 2));
+    return{ok: true};
+
+});
