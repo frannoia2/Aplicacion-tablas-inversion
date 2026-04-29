@@ -22,9 +22,10 @@
   },
   "homepage": "https://github.com/frannoia2/Aplicacion-tablas-inversion#readme",
   "devDependencies": {
-    "electron": "^41.0.2",
+    "electron": "^41.3.0",
     "electron-builder": "^26.8.1",
-    "electronmon": "^2.0.4"
+    "electronmon": "^2.0.4",
+    "nodemon": "^3.1.14"
   },
   "build": {
     "appId": "com.frannoia.aplicacion-tablas-inversion",
