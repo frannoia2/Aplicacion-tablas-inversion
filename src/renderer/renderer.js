@@ -179,6 +179,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("btnVolver").addEventListener("click", volverHome);
     document.getElementById("btnNuevaFila").addEventListener("click", nuevaFila);
     document.getElementById("btnGuardar").addEventListener("click", guardarDatos);
+    document.getElementById("btnPDF").addEventListener("click", exportarPDF);
 });
 
 // Obtener perfiles y mostrarlos
@@ -340,4 +341,23 @@ function actualizarResumen() {
     document.getElementById("totalBruto").textContent = formatearImporte(totalBruto);
     document.getElementById("totalComisiones").textContent = formatearImporte(totalComisiones);
     document.getElementById("totalNeto").textContent = formatearImporte(totalNeto);
+}
+
+// Exportar PDF
+async function exportarPDF() {
+    try {
+        const result = await window.api.generarPDF(perfilActual?.nombre);
+
+        if (result?.ok) {
+            alert("PDF generado correctamente");
+            return;
+        }
+
+        if (!result?.canceled) {
+            alert(result?.error || "No se pudo generar el PDF.");
+        }
+    } catch (error) {
+        console.error("Error al exportar el PDF.", error);
+        alert("Ocurrio un error al generar el PDF.");
+    }
 }

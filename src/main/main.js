@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const fs = require("fs");
 const path = require("path");
 
@@ -99,4 +99,35 @@ ipcMain.handle("guardar-perfil", (event, perfil) => {
 
     fs.writeFileSync(filePath, JSON.stringify(perfil, null, 2));
     return { ok: true };
+});
+
+ipcMain.handle("generar-pdf", async (event, nombrePerfil) => {
+    const ventanaActual = BrowserWindow.fromWebContents(event.sender);
+
+    if (!ventanaActual) {
+        return { ok: false, error: "No se encontro una ventana activa para exportar el PDF." };
+    }
+
+    const nombreBase = typeof nombrePerfil === "string" && nombrePerfil.trim()
+        ? `datos_${nombrePerfil.trim()}.pdf`
+        : "datos_perfil.pdf";
+
+    const { canceled, filePath } = await dialog.showSaveDialog(ventanaActual, {
+        title: "Guardar PDF",
+        defaultPath: nombreBase,
+        filters: [
+            { name: "PDF", extensions: ["pdf"] }
+        ]
+    });
+
+    if (canceled || !filePath) {
+        return { ok: false, canceled: true };
+    }
+
+    const pdf = await ventanaActual.webContents.printToPDF({
+        printBackground: true
+    });
+
+    fs.writeFileSync(filePath, pdf);
+    return { ok: true, filePath };
 });

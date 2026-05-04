@@ -54,3 +54,15 @@ button {
 button:hover {
   background-color: #4338ca;
 }
+
+@media print {
+  button {
+    display: none;
+  }
+  input {
+    display: none;
+  }
+  body {
+    background: white;
+  }
+}
