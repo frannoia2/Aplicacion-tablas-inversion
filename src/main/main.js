@@ -18,6 +18,18 @@ function createWindow() {
 
 app.whenReady().then(createWindow);
 
+app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") {
+        app.quit();
+    }
+});
+
+app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+    }
+});
+
 function getPerfilesPath() {
     const userDataPath = app.getPath("userData");
     const perfilesPath = path.join(userDataPath, "perfiles");
@@ -38,6 +50,14 @@ function validarNombrePerfil(nombre) {
         return { ok: false, error: "El nombre del perfil no es valido" };
     }
 
+    if (nombreNormalizado.endsWith(".")) {
+        return { ok: false, error: "El nombre del perfil no puede terminar en punto" };
+    }
+
+    if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(nombreNormalizado)) {
+        return { ok: false, error: "El nombre del perfil esta reservado por Windows" };
+    }
+
     if (/[<>:"/\\|?*\u0000-\u001F]/.test(nombreNormalizado)) {
         return { ok: false, error: "El nombre del perfil contiene caracteres no permitidos" };
     }
@@ -55,79 +75,151 @@ function resolverRutaPerfil(nombre) {
     return path.join(getPerfilesPath(), `${validacion.nombre}.json`);
 }
 
-ipcMain.handle("crear-perfil", (event, nombre) => {
-    const validacion = validarNombrePerfil(nombre);
+function normalizarPerfil(perfil) {
+    if (!perfil || typeof perfil !== "object") {
+        throw new Error("El perfil no es valido");
+    }
+
+    const validacion = validarNombrePerfil(perfil.nombre);
 
     if (!validacion.ok) {
-        return validacion;
+        throw new Error(validacion.error);
     }
 
-    const filePath = resolverRutaPerfil(validacion.nombre);
-
-    if (fs.existsSync(filePath)) {
-        return { ok: false, error: "El perfil ya existe" };
-    }
-
-    const data = {
+    return {
+        ...perfil,
         nombre: validacion.nombre,
-        inversiones: []
+        inversiones: Array.isArray(perfil.inversiones) ? perfil.inversiones : []
     };
+}
 
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+function leerPerfil(nombre) {
+    const filePath = resolverRutaPerfil(nombre);
 
-    return { ok: true };
+    if (!fs.existsSync(filePath)) {
+        throw new Error("El perfil no existe");
+    }
+
+    const data = fs.readFileSync(filePath, "utf8");
+    return normalizarPerfil(JSON.parse(data));
+}
+
+function manejarError(error, mensaje) {
+    return {
+        ok: false,
+        error: error instanceof Error ? error.message : mensaje
+    };
+}
+
+ipcMain.handle("crear-perfil", (event, nombre) => {
+    try {
+        const validacion = validarNombrePerfil(nombre);
+
+        if (!validacion.ok) {
+            return validacion;
+        }
+
+        const filePath = resolverRutaPerfil(validacion.nombre);
+
+        if (fs.existsSync(filePath)) {
+            return { ok: false, error: "El perfil ya existe" };
+        }
+
+        const data = {
+            nombre: validacion.nombre,
+            inversiones: []
+        };
+
+        fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+
+        return { ok: true };
+    } catch (error) {
+        return manejarError(error, "No se pudo crear el perfil");
+    }
 });
 
 ipcMain.handle("obtener-perfiles", () => {
-    const perfilesPath = getPerfilesPath();
-    const files = fs.readdirSync(perfilesPath);
+    try {
+        const perfilesPath = getPerfilesPath();
+        const files = fs.readdirSync(perfilesPath);
 
-    return files
-        .filter((file) => file.endsWith(".json"))
-        .map((file) => file.replace(".json", ""));
+        return {
+            ok: true,
+            perfiles: files
+                .filter((file) => file.endsWith(".json"))
+                .map((file) => file.replace(/\.json$/i, ""))
+                .sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }))
+        };
+    } catch (error) {
+        return manejarError(error, "No se pudieron obtener los perfiles");
+    }
 });
 
 ipcMain.handle("cargar-perfil", (event, nombre) => {
-    const filePath = resolverRutaPerfil(nombre);
-    const data = fs.readFileSync(filePath);
-
-    return JSON.parse(data);
+    try {
+        return { ok: true, perfil: leerPerfil(nombre) };
+    } catch (error) {
+        return manejarError(error, "No se pudo cargar el perfil");
+    }
 });
 
 ipcMain.handle("guardar-perfil", (event, perfil) => {
-    const filePath = resolverRutaPerfil(perfil?.nombre);
+    try {
+        const perfilNormalizado = normalizarPerfil(perfil);
+        const filePath = resolverRutaPerfil(perfilNormalizado.nombre);
 
-    fs.writeFileSync(filePath, JSON.stringify(perfil, null, 2));
-    return { ok: true };
+        fs.writeFileSync(filePath, JSON.stringify(perfilNormalizado, null, 2));
+        return { ok: true };
+    } catch (error) {
+        return manejarError(error, "No se pudo guardar el perfil");
+    }
+});
+
+ipcMain.on("guardar-perfil-sync", (event, perfil) => {
+    try {
+        const perfilNormalizado = normalizarPerfil(perfil);
+        const filePath = resolverRutaPerfil(perfilNormalizado.nombre);
+
+        fs.writeFileSync(filePath, JSON.stringify(perfilNormalizado, null, 2));
+        event.returnValue = { ok: true };
+    } catch (error) {
+        event.returnValue = manejarError(error, "No se pudo guardar el perfil");
+    }
 });
 
 ipcMain.handle("generar-pdf", async (event, nombrePerfil) => {
-    const ventanaActual = BrowserWindow.fromWebContents(event.sender);
+    try {
+        const ventanaActual = BrowserWindow.fromWebContents(event.sender);
 
-    if (!ventanaActual) {
-        return { ok: false, error: "No se encontro una ventana activa para exportar el PDF." };
+        if (!ventanaActual) {
+            return { ok: false, error: "No se encontro una ventana activa para exportar el PDF." };
+        }
+
+        const nombreBase = typeof nombrePerfil === "string" && nombrePerfil.trim()
+            ? `datos_${nombrePerfil.trim()}.pdf`
+            : "datos_perfil.pdf";
+
+        const { canceled, filePath } = await dialog.showSaveDialog(ventanaActual, {
+            title: "Guardar PDF",
+            defaultPath: nombreBase,
+            filters: [
+                { name: "PDF", extensions: ["pdf"] }
+            ]
+        });
+
+        if (canceled || !filePath) {
+            return { ok: false, canceled: true };
+        }
+
+        const pdf = await ventanaActual.webContents.printToPDF({
+            printBackground: true,
+            pageSize: "A4",
+            landscape: true
+        });
+
+        fs.writeFileSync(filePath, pdf);
+        return { ok: true, filePath };
+    } catch (error) {
+        return manejarError(error, "No se pudo generar el PDF");
     }
-
-    const nombreBase = typeof nombrePerfil === "string" && nombrePerfil.trim()
-        ? `datos_${nombrePerfil.trim()}.pdf`
-        : "datos_perfil.pdf";
-
-    const { canceled, filePath } = await dialog.showSaveDialog(ventanaActual, {
-        title: "Guardar PDF",
-        defaultPath: nombreBase,
-        filters: [
-            { name: "PDF", extensions: ["pdf"] }
-        ]
-    });
-
-    if (canceled || !filePath) {
-        return { ok: false, canceled: true };
-    }
-
-    const pdf = await ventanaActual.webContents.printToPDF({
-        printBackground: true
-    });
-
-    fs.writeFileSync(filePath, pdf);
-    return { ok: true, filePath };
 });

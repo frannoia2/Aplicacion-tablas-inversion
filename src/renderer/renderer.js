@@ -60,6 +60,34 @@ function esValorNumericoValido(cell, value) {
     return Number.isFinite(parsearNumero(value));
 }
 
+function esFechaValida(cell, value) {
+    if (value === "" || value === null || typeof value === "undefined") {
+        return true;
+    }
+
+    if (typeof value !== "string") {
+        return false;
+    }
+
+    const texto = value.trim();
+    const matchISO = texto.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const matchES = texto.match(/^(\d{2})[\/.-](\d{2})[\/.-](\d{4})$/);
+
+    if (!matchISO && !matchES) {
+        return false;
+    }
+
+    const [, primer, segundo, tercero] = matchISO || matchES;
+    const year = matchISO ? Number(primer) : Number(tercero);
+    const month = Number(segundo);
+    const day = matchISO ? Number(tercero) : Number(primer);
+    const fecha = new Date(year, month - 1, day);
+
+    return fecha.getFullYear() === year
+        && fecha.getMonth() === month - 1
+        && fecha.getDate() === day;
+}
+
 function obtenerSignoOperacion(tipo) {
     return tipo === "Venta" ? -1 : 1;
 }
@@ -101,7 +129,8 @@ const columnasInversion = [
     {
         title: "Fecha",
         field: "fecha",
-        editor: "input"
+        editor: "input",
+        validator: esFechaValida
     },
     {
         title: "Activo",
@@ -135,7 +164,7 @@ const columnasInversion = [
         mutateLink: ["total"]
     },
     {
-        title: "Comision",
+        title: "Comisión",
         field: "comision",
         editor: "input",
         validator: esValorNumericoValido,
@@ -158,6 +187,7 @@ const columnasInversion = [
 let perfilActual = null;
 let tabla = null;
 let temporizadorGuardado = null;
+let tablaPDF = null;
 
 function obtenerDatosTablaNormalizados() {
     if (!tabla) {
@@ -180,11 +210,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("btnNuevaFila").addEventListener("click", nuevaFila);
     document.getElementById("btnGuardar").addEventListener("click", guardarDatos);
     document.getElementById("btnPDF").addEventListener("click", exportarPDF);
+    window.addEventListener("beforeunload", guardarAntesDeCerrar);
 });
 
 // Obtener perfiles y mostrarlos
 async function cargarPerfiles() {
-    const perfiles = await window.api.obtenerPerfiles();
+    const result = await window.api.obtenerPerfiles();
+
+    if (!result?.ok) {
+        throw new Error(result?.error || "No se pudieron obtener los perfiles.");
+    }
+
+    const perfiles = result.perfiles;
     const lista = document.getElementById("listaPerfiles");
     lista.innerHTML = "";
 
@@ -206,27 +243,42 @@ async function crearPerfil() {
         return;
     }
 
-    const result = await window.api.crearPerfil(nombre);
+    try {
+        const result = await window.api.crearPerfil(nombre);
 
-    if (!result.ok) {
-        alert(result.error);
-        return;
+        if (!result.ok) {
+            alert(result.error);
+            return;
+        }
+
+        input.value = "";
+        await cargarPerfiles();
+    } catch (error) {
+        console.error("Error al crear el perfil.", error);
+        alert("No se pudo crear el perfil.");
     }
-
-    input.value = "";
-    cargarPerfiles();
 }
 
 // Seleccionar perfil
 async function seleccionarPerfil(nombre) {
-    const data = await window.api.cargarPerfil(nombre);
+    try {
+        const result = await window.api.cargarPerfil(nombre);
 
-    perfilActual = data;
-    document.getElementById("tituloPerfil").textContent = `Perfil: ${nombre}`;
-    mostrarVistaPerfil();
+        if (!result?.ok) {
+            throw new Error(result?.error || "No se pudo cargar el perfil.");
+        }
 
-    crearTabla(perfilActual.inversiones);
-    actualizarResumen();
+        perfilActual = result.perfil;
+        document.getElementById("tituloPerfil").textContent = `Perfil: ${perfilActual.nombre}`;
+        mostrarVistaPerfil();
+
+        crearTabla(perfilActual.inversiones);
+        actualizarResumen();
+        mostrarEstadoGuardado("");
+    } catch (error) {
+        console.error("Error al cargar el perfil.", error);
+        alert(error.message || "No se pudo cargar el perfil.");
+    }
 }
 
 // Navegacion
@@ -235,8 +287,10 @@ function mostrarVistaPerfil() {
     document.getElementById("perfil").classList.remove("hidden");
 }
 
-function volverHome() {
+async function volverHome() {
     cancelarGuardadoProgramado();
+    await guardarDatos({ silencioso: true });
+    restaurarVistaPDF();
     document.getElementById("perfil").classList.add("hidden");
     document.getElementById("home").classList.remove("hidden");
 }
@@ -258,6 +312,7 @@ function crearTabla(inversiones) {
         data: Array.isArray(inversiones) ? inversiones.map((row) => normalizarFilaInversion(row)) : [],
         columns: columnasInversion,
         dataChanged: function () {
+            mostrarEstadoGuardado("Guardando...");
             programarGuardado();
             actualizarResumen();
         }
@@ -280,9 +335,11 @@ function nuevaFila() {
 }
 
 // Guardar datos
-async function guardarDatos() {
+async function guardarDatos(options) {
+    const silencioso = Boolean(options?.silencioso);
+
     if (!tabla || !perfilActual) {
-        return;
+        return true;
     }
 
     cancelarGuardadoProgramado();
@@ -298,8 +355,17 @@ async function guardarDatos() {
         }
 
         console.log("Datos guardados");
+        mostrarEstadoGuardado("Guardado");
+        return true;
     } catch (error) {
         console.error("Error al guardar los datos del perfil.", error);
+        mostrarEstadoGuardado("Error al guardar");
+
+        if (!silencioso) {
+            alert(error.message || "No se pudieron guardar los datos.");
+        }
+
+        return false;
     }
 }
 
@@ -343,9 +409,126 @@ function actualizarResumen() {
     document.getElementById("totalNeto").textContent = formatearImporte(totalNeto);
 }
 
+function mostrarEstadoGuardado(texto) {
+    const estado = document.getElementById("estadoGuardado");
+
+    if (estado) {
+        estado.textContent = texto;
+    }
+}
+
+function crearCeldaTexto(tag, texto) {
+    const celda = document.createElement(tag);
+    celda.textContent = texto;
+    return celda;
+}
+
+function prepararVistaPDF() {
+    restaurarVistaPDF();
+
+    if (!tabla) {
+        return;
+    }
+
+    const contenedorTabla = document.getElementById("tabla-inversiones");
+    const datos = obtenerDatosTablaNormalizados();
+    const columnas = [
+        ["fecha", "Fecha"],
+        ["activo", "Activo"],
+        ["tipo", "Tipo"],
+        ["precio", "Precio"],
+        ["cantidad", "Cantidad"],
+        ["comision", "Comisión"],
+        ["total", "Total"]
+    ];
+
+    tablaPDF = document.createElement("table");
+    tablaPDF.className = "tabla-pdf";
+
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+
+    columnas.forEach(([, titulo]) => {
+        headerRow.appendChild(crearCeldaTexto("th", titulo));
+    });
+
+    thead.appendChild(headerRow);
+    tablaPDF.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+
+    datos.forEach((row) => {
+        const tr = document.createElement("tr");
+
+        columnas.forEach(([campo]) => {
+            const valor = ["precio", "cantidad", "comision", "total"].includes(campo)
+                ? formatearImporte(convertirANumero(row[campo]))
+                : row[campo] || "";
+
+            tr.appendChild(crearCeldaTexto("td", valor));
+        });
+
+        tbody.appendChild(tr);
+    });
+
+    tablaPDF.appendChild(tbody);
+    contenedorTabla.classList.add("preparando-pdf");
+    contenedorTabla.parentNode.insertBefore(tablaPDF, contenedorTabla.nextSibling);
+}
+
+function restaurarVistaPDF() {
+    const contenedorTabla = document.getElementById("tabla-inversiones");
+
+    if (tablaPDF) {
+        tablaPDF.remove();
+        tablaPDF = null;
+    }
+
+    if (contenedorTabla) {
+        contenedorTabla.classList.remove("preparando-pdf");
+    }
+}
+
+function esperarRenderizado() {
+    return new Promise((resolve) => {
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(resolve);
+        });
+    });
+}
+
+function guardarAntesDeCerrar() {
+    if (!tabla || !perfilActual) {
+        return;
+    }
+
+    cancelarGuardadoProgramado();
+
+    try {
+        perfilActual.inversiones = obtenerDatosTablaNormalizados();
+        const result = window.api.guardarPerfilSync(perfilActual);
+
+        if (!result?.ok) {
+            console.error("No se pudo guardar el perfil al cerrar.", result?.error);
+        }
+    } catch (error) {
+        console.error("Error al guardar el perfil al cerrar.", error);
+    }
+}
+
 // Exportar PDF
 async function exportarPDF() {
     try {
+        const guardado = await guardarDatos({ silencioso: true });
+
+        if (!guardado) {
+            alert("No se generó el PDF porque no se pudieron guardar los datos.");
+            return;
+        }
+
+        prepararVistaPDF();
+        await esperarRenderizado();
+
         const result = await window.api.generarPDF(perfilActual?.nombre);
 
         if (result?.ok) {
@@ -358,6 +541,8 @@ async function exportarPDF() {
         }
     } catch (error) {
         console.error("Error al exportar el PDF.", error);
-        alert("Ocurrio un error al generar el PDF.");
+        alert("Ocurrió un error al generar el PDF.");
+    } finally {
+        restaurarVistaPDF();
     }
 }
