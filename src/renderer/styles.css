@@ -49,10 +49,19 @@ button {
   background-color: #4f46e5;
   color: white;
   border-radius: 5px;
+  margin-bottom: 10px;
 }
 
 button:hover {
   background-color: #4338ca;
+}
+
+#btnBorrarFila {
+  background-color: #dc2626;
+}
+
+#btnBorrarFila:hover {
+  background-color: #b91c1c;
 }
 
 .toolbar {

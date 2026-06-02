@@ -52,6 +52,22 @@ function convertirANumero(valor) {
     return Number.isFinite(numero) ? numero : 0;
 }
 
+function formatearFecha(valor) {
+    if (typeof valor !== "string") {
+        return valor;
+    }
+
+    const texto = valor.trim();
+    const matchCompacto = texto.match(/^(\d{2})(\d{2})(\d{4})$/);
+
+    if (!matchCompacto) {
+        return texto;
+    }
+
+    const [, day, month, year] = matchCompacto;
+    return `${day}/${month}/${year}`;
+}
+
 function esValorNumericoValido(cell, value) {
     if (value === "" || value === null || typeof value === "undefined") {
         return true;
@@ -69,7 +85,7 @@ function esFechaValida(cell, value) {
         return false;
     }
 
-    const texto = value.trim();
+    const texto = formatearFecha(value);
     const matchISO = texto.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     const matchES = texto.match(/^(\d{2})[\/.-](\d{2})[\/.-](\d{4})$/);
 
@@ -88,21 +104,21 @@ function esFechaValida(cell, value) {
         && fecha.getDate() === day;
 }
 
-function obtenerSignoOperacion(tipo) {
-    return tipo === "Venta" ? -1 : 1;
-}
-
 function calcularImportesFila(data = {}) {
-    const precio = convertirANumero(data.precio);
-    const cantidad = convertirANumero(data.cantidad);
-    const comision = convertirANumero(data.comision);
-    const signo = obtenerSignoOperacion(data.tipo);
-    const importeBruto = signo * precio * cantidad;
-    const total = importeBruto + comision;
+    const precioCompra = convertirANumero(data.precio_c);
+    const numeroAcciones = convertirANumero(data.n_acc);
+    const precioVenta = convertirANumero(data.precio_v);
+    const dividendos = convertirANumero(data.dividendos);
+    const precioAccion = numeroAcciones > 0 ? precioCompra / numeroAcciones : 0;
+    const totalInvertido = precioVenta > 0 ? 0 : precioCompra;
+    const beneficios = precioVenta > 0 ? precioVenta - precioCompra : 0;
+    const total = beneficios + dividendos;
 
     return {
-        importeBruto,
-        comision,
+        precioAccion,
+        totalInvertido,
+        dividendos,
+        beneficios,
         total
     };
 }
@@ -111,15 +127,41 @@ function formatearImporte(valor) {
     return valor.toFixed(2);
 }
 
+function formatearEuros(valor) {
+    return `${formatearImporte(convertirANumero(valor))} €`;
+}
+
+function formatearCeldaEuros(cell) {
+    return formatearEuros(cell.getValue());
+}
+
+function formatearCeldaFechaEditada(cell) {
+    const valorActual = cell.getValue();
+    const valorFormateado = formatearFecha(valorActual);
+
+    if (valorFormateado !== valorActual) {
+        cell.setValue(valorFormateado);
+    }
+}
+
 function normalizarFilaInversion(data = {}) {
+    const precioCompra = typeof data.precio_c !== "undefined"
+        ? data.precio_c
+        : convertirANumero(data.precio) * convertirANumero(data.cantidad);
+
     const filaNormalizada = {
-        ...data,
-        tipo: data.tipo === "Venta" ? "Venta" : "Compra",
-        precio: convertirANumero(data.precio),
-        cantidad: convertirANumero(data.cantidad),
-        comision: convertirANumero(data.comision)
+        fecha_c: formatearFecha(data.fecha_c || data.fecha || ""),
+        acc: data.acc || data.activo || "",
+        n_acc: convertirANumero(data.n_acc ?? data.cantidad),
+        precio_c: convertirANumero(precioCompra),
+        prec_acc: 0,
+        stop: convertirANumero(data.stop),
+        fecha_v: formatearFecha(data.fecha_v || ""),
+        precio_v: convertirANumero(data.precio_v),
+        dividendos: convertirANumero(data.dividendos)
     };
 
+    filaNormalizada.prec_acc = calcularImportesFila(filaNormalizada).precioAccion;
     filaNormalizada.total = calcularImportesFila(filaNormalizada).total;
 
     return filaNormalizada;
@@ -127,58 +169,82 @@ function normalizarFilaInversion(data = {}) {
 
 const columnasInversion = [
     {
-        title: "Fecha",
-        field: "fecha",
+        title: "Fecha compra",
+        field: "fecha_c",
         editor: "input",
-        validator: esFechaValida
+        validator: esFechaValida,
+        cellEdited: formatearCeldaFechaEditada
     },
     {
-        title: "Activo",
-        field: "activo",
+        title: "Acción",
+        field: "acc",
         editor: "input"
     },
     {
-        title: "Tipo",
-        field: "tipo",
-        editor: "list",
-        editorParams: {
-            values: [
-                "Compra",
-                "Venta"
-            ]
+        title: "Nº Acciones",
+        field: "n_acc",
+        editor: "input",
+        validator: esValorNumericoValido,
+        mutateLink: ["prec_acc", "total"]
+    },
+    {
+        title: "Precio compra",
+        field: "precio_c",
+        editor: "input",
+        validator: esValorNumericoValido,
+        formatter: formatearCeldaEuros,
+        mutateLink: ["prec_acc", "total"]
+    },
+    {
+        title: "Precio/acc",
+        field: "prec_acc",
+        editable: false,
+        mutator: function (value, data) {
+            return calcularImportesFila(data).precioAccion;
         },
-        mutateLink: ["total"]
+        formatter: function (cell) {
+            return formatearEuros(calcularImportesFila(cell.getRow().getData()).precioAccion);
+        }
     },
     {
-        title: "Precio",
-        field: "precio",
+        title: "Stop-loss",
+        field: "stop",
         editor: "input",
         validator: esValorNumericoValido,
-        mutateLink: ["total"]
+        formatter: formatearCeldaEuros
     },
     {
-        title: "Cantidad",
-        field: "cantidad",
+        title: "Fecha venta",
+        field: "fecha_v",
+        editor: "input",
+        validator: esFechaValida,
+        cellEdited: formatearCeldaFechaEditada
+    },
+    {
+        title: "Precio venta",
+        field: "precio_v",
         editor: "input",
         validator: esValorNumericoValido,
+        formatter: formatearCeldaEuros,
         mutateLink: ["total"]
     },
     {
-        title: "Comisión",
-        field: "comision",
+        title: "Dividendos",
+        field: "dividendos",
         editor: "input",
         validator: esValorNumericoValido,
+        formatter: formatearCeldaEuros,
         mutateLink: ["total"]
     },
     {
-        title: "Total",
+        title: "Balance total",
         field: "total",
         editable: false,
         mutator: function (value, data) {
             return calcularImportesFila(data).total;
         },
         formatter: function (cell) {
-            return formatearImporte(calcularImportesFila(cell.getRow().getData()).total);
+            return formatearEuros(calcularImportesFila(cell.getRow().getData()).total);
         }
     }
 ];
@@ -210,6 +276,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("btnNuevaFila").addEventListener("click", nuevaFila);
     document.getElementById("btnGuardar").addEventListener("click", guardarDatos);
     document.getElementById("btnPDF").addEventListener("click", exportarPDF);
+    document.getElementById("btnBorrarFila").addEventListener("click", borrarFilasSeleccionadas);
     window.addEventListener("beforeunload", guardarAntesDeCerrar);
 });
 
@@ -309,6 +376,15 @@ function crearTabla(inversiones) {
     tabla = new Tabulator("#tabla-inversiones", {
         height: "400px",
         layout: "fitColumns",
+        selectableRows: "highlight",
+        rowHeader: {
+            formatter: "rowSelection",
+            titleFormatter: "rowSelection",
+            hozAlign: "center",
+            headerHozAlign: "center",
+            headerSort: false,
+            width: 44
+        },
         data: Array.isArray(inversiones) ? inversiones.map((row) => normalizarFilaInversion(row)) : [],
         columns: columnasInversion,
         dataChanged: function () {
@@ -319,18 +395,45 @@ function crearTabla(inversiones) {
     });
 }
 
+async function borrarFilasSeleccionadas() {
+    if (!tabla) {
+        return;
+    }
+
+    const filasSeleccionadas = tabla.getSelectedRows();
+
+    if (!filasSeleccionadas.length) {
+        alert("Selecciona una o varias filas para borrar.");
+        return;
+    }
+
+    try {
+        await Promise.all(filasSeleccionadas.map((fila) => fila.delete()));
+        actualizarResumen();
+        mostrarEstadoGuardado("Guardando...");
+        programarGuardado();
+    } catch (error) {
+        console.error("Error al borrar filas seleccionadas.", error);
+        alert("No se pudieron borrar las filas seleccionadas.");
+    }
+}
+
 function nuevaFila() {
     if (!tabla) {
         return;
     }
 
     tabla.addRow({
-        fecha: "",
-        activo: "",
-        tipo: "Compra",
-        precio: 0,
-        cantidad: 0,
-        comision: 0
+        fecha_c: "",
+        acc: "",
+        n_acc: 0,
+        precio_c: 0,
+        prec_acc: 0,
+        stop: 0,
+        fecha_v: "",
+        precio_v: 0,
+        dividendos: 0,
+        total: 0
     });
 }
 
@@ -392,21 +495,24 @@ function actualizarResumen() {
     }
 
     const data = obtenerDatosTablaNormalizados();
-    let totalBruto = 0;
-    let totalComisiones = 0;
-    let totalNeto = 0;
+    let totalInvertido = 0;
+    let totalDividendos = 0;
+    let totalBeneficios = 0;
+    let totalFinal = 0;
 
     data.forEach((row) => {
         const importes = calcularImportesFila(row);
 
-        totalBruto += importes.importeBruto;
-        totalComisiones += importes.comision;
-        totalNeto += importes.total;
+        totalInvertido += importes.totalInvertido;
+        totalDividendos += importes.dividendos;
+        totalBeneficios += importes.beneficios;
+        totalFinal += importes.totalInvertido + importes.total;
     });
 
-    document.getElementById("totalBruto").textContent = formatearImporte(totalBruto);
-    document.getElementById("totalComisiones").textContent = formatearImporte(totalComisiones);
-    document.getElementById("totalNeto").textContent = formatearImporte(totalNeto);
+    document.getElementById("totalInvertido").textContent = formatearImporte(totalInvertido);
+    document.getElementById("totalDividendos").textContent = formatearImporte(totalDividendos);
+    document.getElementById("totalBeneficios").textContent = formatearImporte(totalBeneficios);
+    document.getElementById("totalFinal").textContent = formatearImporte(totalFinal);
 }
 
 function mostrarEstadoGuardado(texto) {
@@ -433,14 +539,18 @@ function prepararVistaPDF() {
     const contenedorTabla = document.getElementById("tabla-inversiones");
     const datos = obtenerDatosTablaNormalizados();
     const columnas = [
-        ["fecha", "Fecha"],
-        ["activo", "Activo"],
-        ["tipo", "Tipo"],
-        ["precio", "Precio"],
-        ["cantidad", "Cantidad"],
-        ["comision", "Comisión"],
-        ["total", "Total"]
+        ["fecha_c", "Fecha compra"],
+        ["acc", "Acción"],
+        ["n_acc", "Nº Acciones"],
+        ["precio_c", "Precio compra"],
+        ["prec_acc", "Precio/acc"],
+        ["stop", "Stop-loss"],
+        ["fecha_v", "Fecha venta"],
+        ["precio_v", "Precio venta"],
+        ["dividendos", "Dividendos"],
+        ["total", "Balance total"]
     ];
+    const camposEuro = ["precio_c", "prec_acc", "stop", "precio_v", "dividendos", "total"];
 
     tablaPDF = document.createElement("table");
     tablaPDF.className = "tabla-pdf";
@@ -461,8 +571,8 @@ function prepararVistaPDF() {
         const tr = document.createElement("tr");
 
         columnas.forEach(([campo]) => {
-            const valor = ["precio", "cantidad", "comision", "total"].includes(campo)
-                ? formatearImporte(convertirANumero(row[campo]))
+            const valor = camposEuro.includes(campo)
+                ? formatearEuros(row[campo])
                 : row[campo] || "";
 
             tr.appendChild(crearCeldaTexto("td", valor));
