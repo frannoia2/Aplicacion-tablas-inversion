@@ -144,6 +144,39 @@ function formatearCeldaFechaEditada(cell) {
     }
 }
 
+function obtenerClaseColorFila(data = {}) {
+    const balanceTotal = calcularImportesFila(data).total;
+
+    if (balanceTotal > 0) {
+        return "fila-balance-positivo";
+    }
+
+    if (balanceTotal < 0) {
+        return "fila-balance-negativo";
+    }
+
+    return "fila-balance-neutro";
+}
+
+function aplicarColorFila(row) {
+    const elemento = row.getElement();
+
+    elemento.classList.remove(
+        "fila-balance-positivo",
+        "fila-balance-negativo",
+        "fila-balance-neutro"
+    );
+    elemento.classList.add(obtenerClaseColorFila(row.getData()));
+}
+
+function actualizarColoresFilas() {
+    if (!tabla) {
+        return;
+    }
+
+    tabla.getRows().forEach(aplicarColorFila);
+}
+
 function normalizarFilaInversion(data = {}) {
     const precioCompra = typeof data.precio_c !== "undefined"
         ? data.precio_c
@@ -387,10 +420,12 @@ function crearTabla(inversiones) {
         },
         data: Array.isArray(inversiones) ? inversiones.map((row) => normalizarFilaInversion(row)) : [],
         columns: columnasInversion,
+        rowFormatter: aplicarColorFila,
         dataChanged: function () {
             mostrarEstadoGuardado("Guardando...");
             programarGuardado();
             actualizarResumen();
+            actualizarColoresFilas();
         }
     });
 }
@@ -569,6 +604,8 @@ function prepararVistaPDF() {
 
     datos.forEach((row) => {
         const tr = document.createElement("tr");
+
+        tr.classList.add(obtenerClaseColorFila(row));
 
         columnas.forEach(([campo]) => {
             const valor = camposEuro.includes(campo)

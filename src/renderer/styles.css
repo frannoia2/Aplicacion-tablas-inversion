@@ -1,7 +1,7 @@
 body {
   font-family: Arial, sans-serif;
   margin: 20px;
-  background-color: #f4f6f8;
+  background-color: #5e99d3;
 }
 
 /* vistas */
@@ -22,7 +22,7 @@ ul {
 li {
   background: white;
   padding: 10px;
-  margin: 5px 0;
+  margin: 5px 1000px 5px 10px;
   cursor: pointer;
   border-radius: 5px;
   transition: 0.2s;
@@ -74,6 +74,21 @@ button:hover {
 #estadoGuardado {
   color: #475569;
   font-size: 13px;
+}
+
+.tabulator .tabulator-row.fila-balance-positivo,
+.tabla-pdf .fila-balance-positivo {
+  background-color: #4cee84;
+}
+
+.tabulator .tabulator-row.fila-balance-negativo,
+.tabla-pdf .fila-balance-negativo {
+  background-color: #eb5f5f;
+}
+
+.tabulator .tabulator-row.fila-balance-neutro,
+.tabla-pdf .fila-balance-neutro {
+  background-color: #f8fafc;
 }
 
 .preparando-pdf {
