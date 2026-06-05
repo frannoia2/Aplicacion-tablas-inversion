@@ -131,6 +131,29 @@ function formatearEuros(valor) {
     return `${formatearImporte(convertirANumero(valor))} €`;
 }
 
+function calcularPorcentajeBalance(data = {}) {
+    const precioCompra = convertirANumero(data.precio_c);
+
+    if (precioCompra <= 0) {
+        return null;
+    }
+
+    return (calcularImportesFila(data).total / precioCompra) * 100;
+}
+
+function formatearPorcentaje(valor) {
+    const signo = valor > 0 ? "+" : "";
+    return `${signo}${valor.toFixed(2)} %`;
+}
+
+function formatearBalanceTotal(data = {}) {
+    const importes = calcularImportesFila(data);
+    const porcentaje = calcularPorcentajeBalance(data);
+    const porcentajeTexto = porcentaje === null ? "N/D" : formatearPorcentaje(porcentaje);
+
+    return `${formatearEuros(importes.total)} (${porcentajeTexto})`;
+}
+
 function formatearCeldaEuros(cell) {
     return formatearEuros(cell.getValue());
 }
@@ -277,7 +300,7 @@ const columnasInversion = [
             return calcularImportesFila(data).total;
         },
         formatter: function (cell) {
-            return formatearEuros(calcularImportesFila(cell.getRow().getData()).total);
+            return formatearBalanceTotal(cell.getRow().getData());
         }
     }
 ];
@@ -574,27 +597,57 @@ function prepararVistaPDF() {
     const contenedorTabla = document.getElementById("tabla-inversiones");
     const datos = obtenerDatosTablaNormalizados();
     const columnas = [
-        ["fecha_c", "Fecha compra"],
+        ["fecha_c", "Fecha compra", "col-pdf-ajustada"],
         ["acc", "Acción"],
         ["n_acc", "Nº Acciones"],
-        ["precio_c", "Precio compra"],
-        ["prec_acc", "Precio/acc"],
-        ["stop", "Stop-loss"],
-        ["fecha_v", "Fecha venta"],
-        ["precio_v", "Precio venta"],
-        ["dividendos", "Dividendos"],
-        ["total", "Balance total"]
+        ["precio_c", "Precio compra", "col-pdf-ajustada"],
+        ["prec_acc", "Precio/acc", "col-pdf-ajustada"],
+        ["stop", "Stop-loss", "col-pdf-ajustada"],
+        ["fecha_v", "Fecha venta", "col-pdf-ajustada"],
+        ["precio_v", "Precio venta", "col-pdf-ajustada"],
+        ["dividendos", "Dividendos", "col-pdf-ajustada"],
+        ["total", "Balance total", "col-pdf-balance"]
     ];
+    columnas.forEach((columna) => {
+        if (columna[0] === "acc") {
+            columna[2] = "col-pdf-flexible";
+        }
+
+        if (columna[0] === "n_acc") {
+            columna[2] = "col-pdf-ajustada";
+        }
+    });
+
     const camposEuro = ["precio_c", "prec_acc", "stop", "precio_v", "dividendos", "total"];
 
     tablaPDF = document.createElement("table");
     tablaPDF.className = "tabla-pdf";
 
+    const colgroup = document.createElement("colgroup");
+
+    columnas.forEach(([, , clase]) => {
+        const col = document.createElement("col");
+
+        if (clase) {
+            col.className = clase;
+        }
+
+        colgroup.appendChild(col);
+    });
+
+    tablaPDF.appendChild(colgroup);
+
     const thead = document.createElement("thead");
     const headerRow = document.createElement("tr");
 
-    columnas.forEach(([, titulo]) => {
-        headerRow.appendChild(crearCeldaTexto("th", titulo));
+    columnas.forEach(([, titulo, clase]) => {
+        const th = crearCeldaTexto("th", titulo);
+
+        if (clase) {
+            th.classList.add(clase);
+        }
+
+        headerRow.appendChild(th);
     });
 
     thead.appendChild(headerRow);
@@ -607,12 +660,20 @@ function prepararVistaPDF() {
 
         tr.classList.add(obtenerClaseColorFila(row));
 
-        columnas.forEach(([campo]) => {
-            const valor = camposEuro.includes(campo)
+        columnas.forEach(([campo, , clase]) => {
+            const valor = campo === "total"
+                ? formatearBalanceTotal(row)
+                : camposEuro.includes(campo)
                 ? formatearEuros(row[campo])
                 : row[campo] || "";
 
-            tr.appendChild(crearCeldaTexto("td", valor));
+            const td = crearCeldaTexto("td", valor);
+
+            if (clase) {
+                td.classList.add(clase);
+            }
+
+            tr.appendChild(td);
         });
 
         tbody.appendChild(tr);

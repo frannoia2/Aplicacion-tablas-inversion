@@ -214,7 +214,12 @@ ipcMain.handle("generar-pdf", async (event, nombrePerfil) => {
         const pdf = await ventanaActual.webContents.printToPDF({
             printBackground: true,
             pageSize: "A4",
-            landscape: true
+            landscape: false,
+            margins: {
+                marginType: "custom",
+                left: 0.2,
+                right: 0.2
+            }
         });
 
         fs.writeFileSync(filePath, pdf);

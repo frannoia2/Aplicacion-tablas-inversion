@@ -78,12 +78,12 @@ button:hover {
 
 .tabulator .tabulator-row.fila-balance-positivo,
 .tabla-pdf .fila-balance-positivo {
-  background-color: #4cee84;
+  background-color: #4cee859c;
 }
 
 .tabulator .tabulator-row.fila-balance-negativo,
 .tabla-pdf .fila-balance-negativo {
-  background-color: #eb5f5f;
+  background-color: #eb5f5fb4;
 }
 
 .tabulator .tabulator-row.fila-balance-neutro,
@@ -97,16 +97,40 @@ button:hover {
 
 .tabla-pdf {
   width: 100%;
+  table-layout: auto;
   border-collapse: collapse;
   margin-top: 12px;
   background: white;
+  font-size: 12px;
+}
+
+.tabla-pdf col.col-pdf-ajustada {
+  width: 1%;
+}
+
+.tabla-pdf col.col-pdf-balance {
+  width: 14%;
 }
 
 .tabla-pdf th,
 .tabla-pdf td {
   border: 1px solid #cbd5e1;
-  padding: 6px 8px;
+  padding: 3px 4px;
   text-align: left;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.tabla-pdf .col-pdf-ajustada {
+  white-space: nowrap;
+}
+
+.tabla-pdf .col-pdf-flexible {
+  min-width: 90px;
+}
+
+.tabla-pdf .col-pdf-balance {
+  white-space: nowrap;
 }
 
 .tabla-pdf th {
@@ -122,9 +146,20 @@ button:hover {
   }
   body {
     background: white;
+    margin: 0;
   }
 
   #estadoGuardado {
     display: none;
+  }
+
+  .tabla-pdf {
+    font-size: 12px;
+    margin-top: 12px;
+  }
+
+  .tabla-pdf th,
+  .tabla-pdf td {
+    padding: 3px 4px;
   }
 }
